@@ -1,0 +1,73 @@
+#!/bin/bash
+
+mk_title() {
+  clear
+  echo "KCTL -- matt wicks 2018"
+}
+export -f mk_title
+
+set_p1() {
+  CUR_CONTEXT=`kubectl config current-context`
+  CUR_NS=`kubectl config view | grep namespace | awk '{printf $2}'`
+
+  if [[ $CUR_NS == '' || $CUR_NS == 'default' ]]
+  then
+    SLUG="${CUR_CONTEXT}"
+  else
+    SLUG="${CUR_CONTEXT}|${CUR_NS}"
+  fi
+
+  export PS1="${SLUG} kctl>"
+}
+export -f set_p1
+
+bloop() {
+  VERB=${1}
+  shift
+
+  RESOURCES=`kubectl explain -h | grep -E '\*' | grep -v -E '(all|events)' | awk '{print $2}'`
+  
+  for r in ${RESOURCES}
+  do
+    rc=`kubectl ${VERB} ${r} ${@} 2>&1`
+    if [[ $? -eq 0 ]]
+    then
+      kubectl ${VERB} ${r} ${@}      
+    fi
+  done
+}
+export -f bloop
+
+bdescribe() {
+  bloop describe ${@}
+}
+export -f bdescribe
+
+bget() {
+  bloop get ${@}
+}
+export -f bget
+
+wrap_config() {
+  kubectl config ${@}
+  set_p1
+}
+export -f wrap_config
+
+init() {
+  mk_title
+  set_p1
+
+  COMMANDS=`kubectl | grep -v -E '^[A-Z]' |  awk '{print $1}' | grep -E '^\w' | grep -v 'kubectl'`
+
+  for c in ${COMMANDS}
+  do
+    ac="alias ${c}=\"kubectl ${c}\""
+    eval ${ac}
+  done
+
+  alias config="wrap_config"
+}
+export -f init
+
+bash -i <<< 'init; exec </dev/tty'
