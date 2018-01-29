@@ -21,30 +21,53 @@ set_p1() {
 }
 export -f set_p1
 
-bloop() {
+resource_loop() {
   VERB=${1}
+  RESOURCE_TYPE=${2}
+  RESULT_TYPE=${3}
+  shift
+  shift
   shift
 
-  RESOURCES=`kubectl explain -h | grep -E '\*' | grep -v -E '(all|events)' | awk '{print $2}'`
-  
+  if [[ ${RESOURCE_TYPE} = "priority" ]]
+  then
+    RESOURCES="pods deployments services configmaps secrets jobs cronjobs"
+  else
+    RESOURCES=`kubectl explain -h | grep -E '\*' | grep -v -E '(all|events)' | awk '{print $2}'`
+  fi  
+
   for r in ${RESOURCES}
   do
     rc=`kubectl ${VERB} ${r} ${@} 2>&1`
     if [[ $? -eq 0 ]]
     then
-      kubectl ${VERB} ${r} ${@}      
+      kubectl ${VERB} ${r} ${@}
+      if [[ ${RESULT_TYPE} = "first" ]]
+      then
+        break
+      fi
     fi
   done
 }
-export -f bloop
+export -f resource_loop
+
+adescribe() {
+  resource_loop describe all all ${@}
+}
+export -f adescribe
+
+aget() {
+  resource_loop get all all ${@}
+}
+export -f aget
 
 bdescribe() {
-  bloop describe ${@}
+  resource_loop describe priority first ${@}
 }
 export -f bdescribe
 
 bget() {
-  bloop get ${@}
+  resource_loop get priority first ${@}
 }
 export -f bget
 
